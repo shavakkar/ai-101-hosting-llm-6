@@ -31,15 +31,16 @@ def run_mcp_server(model, tokenizer):
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         outputs = model.generate(
             **inputs,
-            max_new_tokens=150,
-            pad_token_id=tokenizer.eos_token_id  # fixes warning
+            max_new_tokens=80,
+            pad_token_id=tokenizer.eos_token_id,
+            eos_token_id=tokenizer.eos_token_id
         )
         decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
         print("Raw model output:", decoded)
 
         # Extract first JSON block from output
-        match = re.search(r'\{.*\}', decoded, re.DOTALL)
+        match = re.search(r'\{(?:[^{}]|(?R))*\}', decoded, re.DOTALL)
         if match:
             try:
                 tool_call = json.loads(match.group(0))
