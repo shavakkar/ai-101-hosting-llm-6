@@ -3,18 +3,25 @@ import json_repair
 from tools import file_ops
 
 SYSTEM_PROMPT = """
+You are an MCP assistant.
+Available tools: create_file, delete_file, read_file.
 Respond ONLY with a single valid JSON object.
 Do not include explanations, examples, or commentary.
-Available tools: create_file, delete_file, read_file.
+Schema:
+- create_file requires: {"filename": "<string>", "content": "<string>"}
+- delete_file requires: {"filename": "<string>"}
+- read_file requires: {"filename": "<string>"}
 """
 
 DEVELOPER_PROMPT = """
-You are an MCP assistant.
+So, You are an assistant.
 Your responsibility is to interpret user requests and output the correct tool call.
 You must always choose one of the available tools and provide valid parameters.
 """
 
 FEW_SHOT_EXAMPLES = """
+Follow these instruction structure to assist, don't deviate.
+
 User: create a file called hello.txt
 Assistant: {"tool": "create_file", "params": {"filename": "hello.txt", "content": ""}}
 
@@ -48,7 +55,7 @@ def run_mcp_server(model, tokenizer):
         user_input = input(">> ")
 
         # Build prompt with system instruction
-        prompt = SYSTEM_PROMPT + "\n" + DEVELOPER_PROMPT + "\n" + FEW_SHOT_EXAMPLES
+        prompt = SYSTEM_PROMPT + "\n" + FEW_SHOT_EXAMPLES + "\n" + DEVELOPER_PROMPT
         prompt += "\nUser: " + user_input + "\nAssistant:"
 
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
@@ -63,7 +70,7 @@ def run_mcp_server(model, tokenizer):
         print("Raw model output:", decoded)
 
         # Extract first JSON block from output
-        match = re.search(r'\{.*?\}', decoded, re.DOTALL)
+        match = re.findall(r'\{.*?\}', decoded, re.DOTALL)
         if match:
             try:
                 tool_call = json_repair.loads(match.group(0))
