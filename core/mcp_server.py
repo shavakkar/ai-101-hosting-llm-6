@@ -1,25 +1,55 @@
 import json
-from tools.file_ops import create_file, delete_file
+from tools import file_ops
+
+SYSTEM_PROMPT = """
+You are an MCP assistant. 
+When the user asks something, respond ONLY with a JSON tool call.
+
+Format:
+{"tool": "<tool_name>", "params": { ... }}
+
+Examples:
+User: create a file called notes.txt with 'hello'
+Assistant: {"tool": "create_file", "params": {"filename": "notes.txt", "content": "hello"}}
+
+User: delete notes.txt
+Assistant: {"tool": "delete_file", "params": {"filename": "notes.txt"}}
+
+User: read notes.txt
+Assistant: {"tool": "read_file", "params": {"filename": "notes.txt"}}
+"""
 
 def route_tool_call(tool_name, params):
     if tool_name == "create_file":
-        return create_file(params["filename"], params.get("content", ""))
+        return file_ops.create_file(params["filename"], params.get("content", ""))
     elif tool_name == "delete_file":
-        return delete_file(params["filename"])
+        return file_ops.delete_file(params["filename"])
+    elif tool_name == "read_file":
+        return file_ops.read_file(params["filename"])
     else:
         return {"status": "error", "message": f"Unknown tool {tool_name}"}
 
-def run_mcp_server(model, tokenizer):
-    print("MCP server running... type a command like 'create a file named test.txt'")
-    while True:
-        user_input = input(">> ")
+def run_mcp_server(model, tokenizer): 
+    print("MCP server running... type a command like 'create a file named test.txt'") 
+    
+    while True: 
+        user_input = input(">> ") 
+    
+        # Build prompt with system instruction 
+        prompt = SYSTEM_PROMPT + "\nUser: " + user_input + "\nAssistant:" 
 
-        # For now, we’ll just simulate tool routing
-        if "create" in user_input:
-            response = route_tool_call("create_file", {"filename": "test.txt", "content": "Hello MCP!"})
-        elif "delete" in user_input:
-            response = route_tool_call("delete_file", {"filename": "test.txt"})
-        else:
-            response = {"status": "info", "message": "No matching tool."}
+        inputs = tokenizer(prompt, return_tensors="pt").to(model.device) 
+        outputs = model.generate(**inputs, max_new_tokens=150) 
+        decoded = tokenizer.decode(outputs[0], skip_special_tokens=True) 
 
+        print("Raw model output:", decoded) # Try to parse JSON 
+
+        try: 
+            tool_call = json.loads(decoded) 
+            tool_name = tool_call["tool"] 
+            params = tool_call["params"] 
+            response = route_tool_call(tool_name, params) 
+        except Exception as e: 
+            response = {"status": "error", "message": f"Failed to parse tool call: {e}"} 
+        
         print("Response:", response)
