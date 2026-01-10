@@ -1,14 +1,28 @@
 import re
-import json
+import json_repair
 from tools import file_ops
 
-SYSTEM_PROMPT = """
+SYSTEM_PROMPT = SYSTEM_PROMPT = """
 You are an MCP assistant. 
-Respond ONLY with a single JSON tool call.
+Available tools: create_file, delete_file, read_file.
+Respond ONLY with a single JSON object.
+Do not include explanations, examples, or placeholders.
 
-Format:
+Schema:
+- create_file requires: {"filename": "<string>", "content": "<string>"}
+- delete_file requires: {"filename": "<string>"}
+- read_file requires: {"filename": "<string>"}
+
+Output format:
 {"tool": "<tool_name>", "params": { ... }}
 """
+
+# def normalize_tool(tool_name):
+#     synonyms = {
+#         "readme": "create_file",
+#         "file": "create_file"
+#     }
+#     return synonyms.get(tool_name, tool_name)
 
 def route_tool_call(tool_name, params):
     if tool_name == "create_file":
@@ -40,10 +54,10 @@ def run_mcp_server(model, tokenizer):
         print("Raw model output:", decoded)
 
         # Extract first JSON block from output
-        match = re.search(r'\{(?:[^{}]|(?R))*\}', decoded, re.DOTALL)
+        match = re.search(r'\{.*?\}', decoded, re.DOTALL)
         if match:
             try:
-                tool_call = json.loads(match.group(0))
+                tool_call = json_repair.loads(match.group(0))
                 tool_name = tool_call["tool"]
                 params = tool_call["params"]
                 response = route_tool_call(tool_name, params)
