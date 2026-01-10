@@ -2,19 +2,27 @@ import re
 import json_repair
 from tools import file_ops
 
-SYSTEM_PROMPT = SYSTEM_PROMPT = """
-You are an MCP assistant. 
+SYSTEM_PROMPT = """
+Respond ONLY with a single valid JSON object.
+Do not include explanations, examples, or commentary.
 Available tools: create_file, delete_file, read_file.
-Respond ONLY with a single JSON object.
-Do not include explanations, examples, or placeholders.
+"""
 
-Schema:
-- create_file requires: {"filename": "<string>", "content": "<string>"}
-- delete_file requires: {"filename": "<string>"}
-- read_file requires: {"filename": "<string>"}
+DEVELOPER_PROMPT = """
+You are an MCP assistant.
+Your responsibility is to interpret user requests and output the correct tool call.
+You must always choose one of the available tools and provide valid parameters.
+"""
 
-Output format:
-{"tool": "<tool_name>", "params": { ... }}
+FEW_SHOT_EXAMPLES = """
+User: create a file called hello.txt
+Assistant: {"tool": "create_file", "params": {"filename": "hello.txt", "content": ""}}
+
+User: delete hello.txt
+Assistant: {"tool": "delete_file", "params": {"filename": "hello.txt"}}
+
+User: read hello.txt
+Assistant: {"tool": "read_file", "params": {"filename": "hello.txt"}}
 """
 
 # def normalize_tool(tool_name):
@@ -40,7 +48,8 @@ def run_mcp_server(model, tokenizer):
         user_input = input(">> ")
 
         # Build prompt with system instruction
-        prompt = SYSTEM_PROMPT + "\nUser: " + user_input + "\nAssistant:"
+        prompt = SYSTEM_PROMPT + "\n" + DEVELOPER_PROMPT + "\n" + FEW_SHOT_EXAMPLES
+        prompt += "\nUser: " + user_input + "\nAssistant:"
 
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         outputs = model.generate(
