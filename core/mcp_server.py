@@ -1,11 +1,11 @@
 import json
-import tools as file_ops
+from tools.file_ops import create_file, delete_file
 
 def route_tool_call(tool_name, params):
     if tool_name == "create_file":
-        return file_ops.create_file(params["filename"], params.get("content", ""))
+        return create_file(params["filename"], params.get("content", ""))
     elif tool_name == "delete_file":
-        return file_ops.delete_file(params["filename"])
+        return delete_file(params["filename"])
     else:
         return {"status": "error", "message": f"Unknown tool {tool_name}"}
 

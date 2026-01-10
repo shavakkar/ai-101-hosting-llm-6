@@ -5,7 +5,7 @@ def load_model(model_path="/models/deepseek-qwen-distill-1.5b"):
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
-        torch_dtype=torch.float16,
+        dtype=torch.float16,
         device_map="auto"   # auto-detect CPU/GPU
     )
     return model, tokenizer
