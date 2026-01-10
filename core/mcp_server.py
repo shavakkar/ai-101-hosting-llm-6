@@ -1,5 +1,5 @@
 import json
-from tools import file_ops
+import tools as file_ops
 
 def route_tool_call(tool_name, params):
     if tool_name == "create_file":
