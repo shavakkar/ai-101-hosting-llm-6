@@ -8,16 +8,6 @@ Respond ONLY with a single JSON tool call.
 
 Format:
 {"tool": "<tool_name>", "params": { ... }}
-
-Examples:
-User: create a file called notes.txt with 'hello'
-Assistant: {"tool": "create_file", "params": {"filename": "notes.txt", "content": "hello"}}
-
-User: delete notes.txt
-Assistant: {"tool": "delete_file", "params": {"filename": "notes.txt"}}
-
-User: read notes.txt
-Assistant: {"tool": "read_file", "params": {"filename": "notes.txt"}}
 """
 
 def route_tool_call(tool_name, params):
