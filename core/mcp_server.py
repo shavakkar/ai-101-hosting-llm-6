@@ -11,21 +11,41 @@ Schema:
 - create_file requires: {"filename": "<string>", "content": "<string>"}
 - delete_file requires: {"filename": "<string>"}
 - read_file requires: {"filename": "<string>"}
-Some examples are given below.
+
+File Structure: 
+- <<filename>>.<<Extension>> (example: math.js, User.php, etc etc)
+- FileName;
+    => Take it from user prompt
+    => if doesn't exist provide a name
+    => don't use file extension as filename
+    => If related to programming follow the Naming convention
+- Extension;
+    => Always have a extension
+    => understand extension from user prompt
+    => could be programming language or any other format
+    => understand the user context and provide exact extension
+- The prompt might be very lame without file extension or just 3 words, don't confuse and build accordingly, 
+example: "create react", you know, it is a react file, provide some name & content.
+So, if the prompt relates to a programming language terms, use a name and with the exact extenion.
+
+Note: Never miss to add extension for the file name.
 """
 
 DEVELOPER_PROMPT = """
 So, You are an assistant.
 Your responsibility is to interpret user requests and output the correct tool call.
-You must always choose one of the available tools and provide valid parameters.
-The user might ask for any files related to programming languages or any other file format that exists in the world.
+Always choose one of the available tools and provide valid parameters no additional added.
 """
 
 FEW_SHOT_EXAMPLES = """
 Follow these instruction structure as an example to assist and do the process, don't deviate.
 The below are some example way of creating the tool call, this resembles the Schema given.
-You should provide the very similar JSON structure by replacing the filename in according to the user's input.
-For creating the file, get the input accordingly and provide it to "content", if "none" leave it, if user askes to fill something, provide something relevant to the context of the user's input.
+You should provide the very similar JSON structure by replacing the filename & extension in according to the user's input.
+For creating file; 
+take filename and for content,
+if user provides some additional input to fill "content", use it.
+if none, leave it.
+if asks to fill something, fill the file with some related content.
 
 User: create a file called hello.txt
 Assistant: {"tool": "create_file", "params": {"filename": "hello.txt", "content": ""}}
@@ -45,6 +65,7 @@ Now, you will get the User's input. Try to follow all the above and return a JSO
 #         "file": "create_file"
 #     }
 #     return synonyms.get(tool_name, tool_name)
+# Now, you will get the User's input. Follow all the above rules and return a JSON object without any additional attributes in the JSON repsonse.
 
 def route_tool_call(tool_name, params):
     if tool_name == "create_file":
