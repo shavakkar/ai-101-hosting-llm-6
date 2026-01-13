@@ -1,6 +1,51 @@
 import re
 import json_repair
 from tools import file_ops
+from core.logger import log_output
+
+# SYSTEM_PROMPT = """
+# You are an MCP assistant.
+# Available tools: create_file, delete_file, read_file.
+# Respond ONLY with a single valid JSON object.
+# Do not include explanations, examples, or commentary.
+
+# Schema:
+# - create_file requires: {"filename": "<string>", "content": "<string>"}
+# - delete_file requires: {"filename": "<string>"}
+# - read_file requires: {"filename": "<string>"}
+
+# Rules:
+# - Always output a JSON object with the correct tool and parameters.
+# - Always include a file extension in the filename.
+# - Infer the extension from the user’s request (programming language, framework, or file type).
+# - If the user does not provide a filename, invent a sensible one that matches the context.
+# - If the user provides content, put it in "content". If not, leave "content" empty.
+# - Never output commentary, only the JSON object.
+# """
+
+# DEVELOPER_PROMPT = """
+# You are an assistant whose responsibility is to interpret user requests and output the correct tool call.
+# Always choose one of the available tools and provide valid parameters.
+# Infer file extensions and names from the user’s input using your knowledge of programming languages, frameworks, and file formats.
+# """
+
+FEW_SHOT_EXAMPLES = """
+User: create a file called hello.txt
+Assistant: {"tool": "create_file", "params": {"filename": "hello.txt", "content": ""}}
+
+User: delete hello.txt
+Assistant: {"tool": "delete_file", "params": {"filename": "hello.txt"}}
+
+User: read hello.txt
+Assistant: {"tool": "read_file", "params": {"filename": "hello.txt"}}
+
+User: create a python script
+Assistant: {"tool": "create_file", "params": {"filename": "script.py", "content": ""}}
+
+User: create a java class
+Assistant: {"tool": "create_file", "params": {"filename": "MyClass.java", "content": ""}}
+"""
+
 
 SYSTEM_PROMPT = """
 You are an MCP assistant.
@@ -28,6 +73,14 @@ File Structure:
 example: "create react", you know, it is a react file, provide some name & content.
 So, if the prompt relates to a programming language terms, use a name and with the exact extenion.
 
+Rules:
+- Always output a JSON object with the correct tool and parameters.
+- Always include a file extension in the filename.
+- Infer the extension from the user’s request (programming language, framework, or file type).
+- If the user does not provide a filename, invent a sensible one that matches the context.
+- If the user provides content, put it in "content". If not, leave "content" empty.
+- Never output commentary, only the JSON object.
+
 Note: Never miss to add extension for the file name.
 """
 
@@ -37,27 +90,27 @@ Your responsibility is to interpret user requests and output the correct tool ca
 Always choose one of the available tools and provide valid parameters no additional added.
 """
 
-FEW_SHOT_EXAMPLES = """
-Follow these instruction structure as an example to assist and do the process, don't deviate.
-The below are some example way of creating the tool call, this resembles the Schema given.
-You should provide the very similar JSON structure by replacing the filename & extension in according to the user's input.
-For creating file; 
-take filename and for content,
-if user provides some additional input to fill "content", use it.
-if none, leave it.
-if asks to fill something, fill the file with some related content.
+# FEW_SHOT_EXAMPLES = """
+# Follow these instruction structure as an example to assist and do the process, don't deviate.
+# The below are some example way of creating the tool call, this resembles the Schema given.
+# You should provide the very similar JSON structure by replacing the filename & extension in according to the user's input.
+# For creating file; 
+# take filename and for content,
+# if user provides some additional input to fill "content", use it.
+# if none, leave it.
+# if asks to fill something, fill the file with some related content.
 
-User: create a file called hello.txt
-Assistant: {"tool": "create_file", "params": {"filename": "hello.txt", "content": ""}}
+# User: create a file called hello.txt
+# Assistant: {"tool": "create_file", "params": {"filename": "hello.txt", "content": ""}}
 
-User: delete hello.txt
-Assistant: {"tool": "delete_file", "params": {"filename": "hello.txt"}}
+# User: delete hello.txt
+# Assistant: {"tool": "delete_file", "params": {"filename": "hello.txt"}}
 
-User: read hello.txt
-Assistant: {"tool": "read_file", "params": {"filename": "hello.txt"}}
+# User: read hello.txt
+# Assistant: {"tool": "read_file", "params": {"filename": "hello.txt"}}
 
-Now, you will get the User's input. Try to follow all the above and return a JSON object like the above examples.
-"""
+# Now, you will get the User's input. Try to follow all the above and return a JSON object like the above examples.
+# """
 
 # def normalize_tool(tool_name):
 #     synonyms = {
@@ -66,6 +119,54 @@ Now, you will get the User's input. Try to follow all the above and return a JSO
 #     }
 #     return synonyms.get(tool_name, tool_name)
 # Now, you will get the User's input. Follow all the above rules and return a JSON object without any additional attributes in the JSON repsonse.
+
+def process_output(user_input, decoded):
+    """Extract JSON tool call from model output and log everything."""
+    matches = re.findall(r'\{.*?\}', decoded, re.DOTALL)
+    tool_call = None
+    if matches:
+        try:
+            tool_call = json_repair.loads(matches[-1])  # take last JSON block
+        except Exception as e:
+            tool_call = {"error": str(e)}
+
+    # Log raw + parsed output
+    log_output(user_input, decoded, tool_call)
+    return tool_call
+
+# def run_mcp_server(model, tokenizer, route_tool_call):
+#     print("MCP server running... type a command like 'create a file named test.txt'")
+#     while True:
+#         user_input = input(">> ")
+
+#         # Build prompt
+#         prompt = SYSTEM_PROMPT + "\n" + DEVELOPER_PROMPT + "\n" + FEW_SHOT_EXAMPLES
+#         prompt += "\nUser: " + user_input + "\nAssistant:"
+
+#         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+#         outputs = model.generate(
+#             **inputs,
+#             max_new_tokens=80,
+#             pad_token_id=tokenizer.eos_token_id,
+#             eos_token_id=tokenizer.eos_token_id,
+#             dtype=torch.float32  # your precision choice
+#         )
+#         decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+#         print("Raw model output:", decoded)
+
+#         tool_call = process_output(user_input, decoded)
+
+#         if tool_call and "tool" in tool_call and "params" in tool_call:
+#             try:
+#                 response = route_tool_call(tool_call["tool"], tool_call["params"])
+#             except Exception as e:
+#                 response = {"status": "error", "message": str(e)}
+#         else:
+#             response = {"status": "error", "message": "No valid tool call"}
+
+#         print("Response:", response)
+
 
 def route_tool_call(tool_name, params):
     if tool_name == "create_file":
@@ -96,6 +197,7 @@ def run_mcp_server(model, tokenizer):
         )
         decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
+        process_output(user_input, decoded)
         print("Raw model output:", decoded)
 
         # Extract first JSON block from output
